@@ -1,0 +1,13 @@
+<div class="row" [formGroup]="formGroup()">
+  <div class="repo-name-cell">
+    <span class="repo-name">{{ repositoryName() }}</span>
+  </div>
+
+  <app-branch-selector class="cell" formControlName="branch" [repository]="repositorySlug()" />
+
+  <app-pipeline-selector class="cell" formControlName="pipeline" [repository]="repositorySlug()" [branch]="currentBranchValue()" />
+
+  <button mat-icon-button type="button" matTooltip="Remove from deployment" (click)="removeRow.emit()">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>

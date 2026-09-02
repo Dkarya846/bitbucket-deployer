@@ -1,0 +1,66 @@
+<div class="history-page">
+  <div class="header-row">
+    <h1>Deployment History</h1>
+    <a mat-flat-button color="primary" routerLink="/deploy">New Deployment</a>
+  </div>
+
+  <p class="info-banner">
+    <mat-icon inline>info</mat-icon>
+    This list reflects deployments triggered since the backend last started — persistent history is not yet implemented.
+  </p>
+
+  @if (loading()) {
+    <div class="state-row">
+      <mat-spinner diameter="24" />
+      <span>Loading deployment history…</span>
+    </div>
+  } @else if (error()) {
+    <div class="state-row error">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ error() }}</span>
+      <button mat-button type="button" (click)="load()">Retry</button>
+    </div>
+  } @else if (deployments().length === 0) {
+    <div class="state-row empty">
+      <mat-icon>history</mat-icon>
+      <span>No deployments yet.</span>
+    </div>
+  } @else {
+    <table mat-table [dataSource]="deployments()" class="history-table">
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef>Deployment ID</th>
+        <td mat-cell *matCellDef="let row">
+          <a [routerLink]="['/deployments', row.id]">{{ row.id }}</a>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="environment">
+        <th mat-header-cell *matHeaderCellDef>Environment</th>
+        <td mat-cell *matCellDef="let row">{{ row.environment }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="createdBy">
+        <th mat-header-cell *matHeaderCellDef>User</th>
+        <td mat-cell *matCellDef="let row">{{ row.createdBy }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="createdAt">
+        <th mat-header-cell *matHeaderCellDef>Created At</th>
+        <td mat-cell *matCellDef="let row">{{ row.createdAt | date: 'medium' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="repositoryCount">
+        <th mat-header-cell *matHeaderCellDef>Repositories</th>
+        <td mat-cell *matCellDef="let row">{{ row.repositoryCount }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let row"><app-status-badge [status]="row.status" /></td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  }
+</div>

@@ -1,0 +1,63 @@
+<div class="dashboard">
+  <h1>Multi-Repo Deployment</h1>
+
+  <mat-form-field appearance="outline" class="environment-field">
+    <mat-label>Environment</mat-label>
+    <mat-select [value]="selectedEnvironmentId()" (selectionChange)="selectedEnvironmentId.set($event.value)">
+      @for (env of environments; track env.id) {
+        <mat-option [value]="env.id">{{ env.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-card appearance="outlined" class="section">
+    <app-repository-selector [(selected)]="selectedRepositories" />
+  </mat-card>
+
+  @if (rows().length > 0) {
+    <mat-card appearance="outlined" class="section">
+      @for (row of rows(); track row.slug) {
+        <app-repository-deployment-row
+          [formGroup]="row.form"
+          [repositoryName]="row.name"
+          [repositorySlug]="row.slug"
+          (removeRow)="selectedRepositories.set(selectedRepositories().filter((r) => r.slug !== row.slug))"
+        />
+      }
+    </mat-card>
+
+    <p class="selected-count">Selected: {{ rows().length }} repositor{{ rows().length === 1 ? 'y' : 'ies' }}</p>
+
+    @if (validationError()) {
+      <div class="banner error">{{ validationError() }}</div>
+    }
+    @if (deployError()) {
+      <div class="banner error">{{ deployError() }}</div>
+    }
+
+    @if (validationResult()) {
+      <mat-card appearance="outlined" class="section">
+        <h2>Deployment Validation</h2>
+        <app-deployment-summary [rows]="validationSummaryRows()" [showValidation]="true" />
+      </mat-card>
+    }
+
+    @if (validating() || deploying()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+
+    <div class="actions">
+      <button mat-stroked-button type="button" [disabled]="!canSubmit() || validating() || deploying()" (click)="runValidation()">
+        Validate
+      </button>
+      <button mat-flat-button color="primary" type="button" [disabled]="!canSubmit() || validating() || deploying()" (click)="openConfirmation()">
+        Deploy {{ rows().length }} Repositor{{ rows().length === 1 ? 'y' : 'ies' }}
+      </button>
+    </div>
+  } @else {
+    <div class="empty-state">
+      <mat-icon>inbox</mat-icon>
+      <p>Select one or more repositories above to configure a deployment.</p>
+    </div>
+  }
+</div>

@@ -1,0 +1,12 @@
+@for (item of items(); track item.repository) {
+  <div class="progress-item">
+    <div class="info">
+      <span class="repo">{{ item.repository }}</span>
+      <span class="path">{{ item.branch }} &rarr; {{ item.pipeline }}</span>
+      @if (item.status === 'Failed' && item.errorMessage) {
+        <span class="item-error">{{ item.errorMessage }}</span>
+      }
+    </div>
+    <app-status-badge [status]="item.status" />
+  </div>
+}

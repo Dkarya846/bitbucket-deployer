@@ -1,0 +1,22 @@
+<h2 mat-dialog-title>Deploy to {{ data.environment.name }}?</h2>
+
+<mat-dialog-content>
+  <app-deployment-summary [rows]="data.rows" />
+
+  <p class="trigger-note">
+    This will trigger {{ data.rows.length }} Bitbucket pipeline{{ data.rows.length === 1 ? '' : 's' }}.
+  </p>
+
+  @if (data.environment.requiresExtraConfirmation) {
+    <mat-checkbox [checked]="extraConfirmationChecked()" (change)="extraConfirmationChecked.set($event.checked)">
+      I understand this deploys to <strong>{{ data.environment.name }}</strong>.
+    </mat-checkbox>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">Cancel</button>
+  <button mat-flat-button color="primary" type="button" [disabled]="!canConfirm" (click)="confirm()">
+    Confirm Deployment
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,36 @@
+<div class="details-page">
+  <a routerLink="/deploy" class="back-link">&larr; New deployment</a>
+
+  @if (loading()) {
+    <div class="state-row">
+      <mat-spinner diameter="24" />
+      <span>Loading deployment…</span>
+    </div>
+  } @else if (!deployment()) {
+    <div class="state-row error">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ error() ?? 'Deployment not found.' }}</span>
+    </div>
+  } @else {
+    <header class="header">
+      <div>
+        <h1>Deployment #{{ deployment()!.id }}</h1>
+        <p class="meta">Environment: {{ deployment()!.environment }} &middot; Started by {{ deployment()!.createdBy }}</p>
+      </div>
+      <app-status-badge [status]="deployment()!.status" />
+    </header>
+
+    @if (error()) {
+      <div class="banner error">{{ error() }}</div>
+    }
+
+    <mat-card appearance="outlined" class="section">
+      <app-deployment-progress [items]="deployment()!.items" />
+    </mat-card>
+
+    <div class="actions">
+      <button mat-stroked-button type="button" [disabled]="!canCancel()" (click)="cancelDeployment()">Cancel</button>
+      <button mat-flat-button color="primary" type="button" [disabled]="!canRetry()" (click)="retryDeployment()">Retry Failed</button>
+    </div>
+  }
+</div>

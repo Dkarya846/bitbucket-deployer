@@ -1,0 +1,4 @@
+<span class="status-badge" [class]="presentation().cssClass">
+  <mat-icon [class.spin]="status() === 'Running'">{{ presentation().icon }}</mat-icon>
+  {{ presentation().label }}
+</span>

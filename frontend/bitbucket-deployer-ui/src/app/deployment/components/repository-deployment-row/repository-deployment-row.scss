@@ -1,0 +1,33 @@
+.row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 2fr 2fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.repo-name-cell {
+  min-width: 0;
+}
+
+.repo-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

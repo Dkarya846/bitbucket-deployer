@@ -1,0 +1,21 @@
+<mat-form-field appearance="outline" class="pipeline-field">
+  <mat-label>Pipeline</mat-label>
+  <mat-select [formControl]="control" (blur)="markTouched()" [placeholder]="branch() ? 'Select pipeline' : 'Select a branch first'">
+    @for (pipeline of pipelines(); track pipeline.pattern) {
+      <mat-option [value]="pipeline.pattern">
+        {{ pipeline.displayName }}
+        @if (pipeline.requiresVariables) {
+          <mat-icon class="variables-hint" [matTooltip]="'Requires variables at trigger time'" inline>tune</mat-icon>
+        }
+      </mat-option>
+    }
+    @if (pipelines().length === 0 && !loading()) {
+      <mat-option disabled>No custom pipelines found</mat-option>
+    }
+  </mat-select>
+  @if (loading()) {
+    <mat-spinner matSuffix diameter="18" />
+  } @else if (error()) {
+    <mat-icon matSuffix color="warn" [matTooltip]="error()!">error_outline</mat-icon>
+  }
+</mat-form-field>

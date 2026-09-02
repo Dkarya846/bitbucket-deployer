@@ -1,0 +1,58 @@
+<mat-form-field appearance="outline" class="search-field">
+  <mat-icon matPrefix>search</mat-icon>
+  <input
+    matInput
+    placeholder="Search repositories..."
+    [ngModel]="searchTerm()"
+    (ngModelChange)="searchTerm.set($event)"
+    aria-label="Search repositories"
+  />
+</mat-form-field>
+
+<div class="toolbar">
+  <button mat-stroked-button type="button" (click)="selectAllVisible()" [disabled]="allVisibleSelected() || repositories().length === 0">
+    Select All
+  </button>
+  <button mat-stroked-button type="button" (click)="clearAll()" [disabled]="selected().length === 0">Clear</button>
+  <span class="selected-count">{{ selected().length }} selected</span>
+</div>
+
+@if (loading()) {
+  <div class="state-row">
+    <mat-spinner diameter="24" />
+    <span>Loading repositories…</span>
+  </div>
+} @else if (error()) {
+  <div class="state-row error">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ error() }}</span>
+  </div>
+} @else if (repositories().length === 0) {
+  <div class="state-row empty">
+    <mat-icon>folder_off</mat-icon>
+    <span>No repositories found.</span>
+  </div>
+} @else {
+  <ul class="repository-list">
+    @for (repo of repositories(); track repo.slug) {
+      <li>
+        <mat-checkbox [checked]="isSelected(repo.slug)" (change)="toggle(repo, $event.checked)">
+          <span class="repo-name">{{ repo.name }}</span>
+          @if (repo.project) {
+            <span class="repo-project">{{ repo.project }}</span>
+          }
+        </mat-checkbox>
+      </li>
+    }
+  </ul>
+
+  @if (nextPageToken()) {
+    <button mat-button type="button" (click)="loadMore()" [disabled]="loadingMore()">
+      @if (loadingMore()) {
+        <mat-spinner diameter="16" />
+      } @else {
+        Load more
+      }
+    </button>
+  }
+}
