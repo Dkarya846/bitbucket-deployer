@@ -5,9 +5,34 @@
 
   <app-branch-selector class="cell" formControlName="branch" [repository]="repositorySlug()" />
 
-  <app-pipeline-selector class="cell" formControlName="pipeline" [repository]="repositorySlug()" [branch]="currentBranchValue()" />
+  <app-pipeline-selector
+    class="cell"
+    formControlName="pipeline"
+    [repository]="repositorySlug()"
+    [branch]="currentBranchValue()"
+    (pipelineSelected)="onPipelineSelected($event)"
+  />
 
   <button mat-icon-button type="button" matTooltip="Remove from deployment" (click)="removeRow.emit()">
     <mat-icon>close</mat-icon>
   </button>
+
+  @if (selectedPipelineVariables().length > 0) {
+    <div class="variables-section" [formGroup]="formGroup().controls.variables">
+      @for (variable of selectedPipelineVariables(); track variable.name) {
+        <mat-form-field appearance="outline" class="variable-field">
+          <mat-label>{{ variable.name }}</mat-label>
+          @if (variable.allowedValues && variable.allowedValues.length > 0) {
+            <mat-select [formControlName]="variable.name">
+              @for (choice of variable.allowedValues; track choice) {
+                <mat-option [value]="choice">{{ choice }}</mat-option>
+              }
+            </mat-select>
+          } @else {
+            <input matInput [formControlName]="variable.name" [type]="isSensitive(variable.name) ? 'password' : 'text'" autocomplete="off" />
+          }
+        </mat-form-field>
+      }
+    </div>
+  }
 </div>

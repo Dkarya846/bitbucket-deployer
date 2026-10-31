@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using BitbucketDeployer.Api.Auth.Services;
+using BitbucketDeployer.Api.Deployment.Configuration;
 using BitbucketDeployer.Api.Deployment.DTOs;
 using BitbucketDeployer.Api.Deployment.Services;
 
@@ -6,12 +9,24 @@ namespace BitbucketDeployer.Api.Deployment.Controllers;
 
 [ApiController]
 [Route("api/deployments")]
-public class DeploymentController(IBitbucketService bitbucketService, IDeploymentService deploymentService) : ControllerBase
+public class DeploymentController(
+    IBitbucketService bitbucketService,
+    IDeploymentService deploymentService,
+    ICurrentSessionAccessor currentSessionAccessor,
+    IOptions<List<DeploymentEnvironmentOptions>> environmentOptions) : ControllerBase
 {
-    // No authentication is wired up yet — this always resolves to "anonymous" until real auth
-    // middleware sets HttpContext.User. Kept as a single seam so that wiring is a one-line change.
-    private string CurrentUserId => User.Identity?.Name ?? "anonymous";
-
+    /// <summary>
+    /// The deployment targets to offer in the UI, as configured server-side — the frontend no
+    /// longer hardcodes this list, so it stays in sync with whatever this app is actually set up
+    /// to deploy to without a frontend code change.
+    /// </summary>
+    [HttpGet("environments")]
+    [ProducesResponseType<List<DeploymentEnvironmentResponse>>(StatusCodes.Status200OK)]
+    public ActionResult<List<DeploymentEnvironmentResponse>> GetEnvironments()
+    {
+        var environments = environmentOptions.Value.Select(DeploymentEnvironmentResponse.FromOptions).ToList();
+        return Ok(environments);
+    }
 
     /// <summary>Repositories in the configured workspace. Supports search and cursor pagination.</summary>
     [HttpGet("repositories")]
@@ -69,7 +84,8 @@ public class DeploymentController(IBitbucketService bitbucketService, IDeploymen
     public async Task<ActionResult<ValidationResultResponse>> Validate(
         [FromBody] CreateDeploymentRequest request, CancellationToken cancellationToken)
     {
-        var result = await deploymentService.ValidateAsync(request, CurrentUserId, cancellationToken);
+        var userId = await currentSessionAccessor.GetDisplayNameAsync(cancellationToken);
+        var result = await deploymentService.ValidateAsync(request, userId, cancellationToken);
         return Ok(ValidationResultResponse.FromModel(result));
     }
 
@@ -80,7 +96,8 @@ public class DeploymentController(IBitbucketService bitbucketService, IDeploymen
     public async Task<ActionResult<DeploymentResponse>> CreateDeployment(
         [FromBody] CreateDeploymentRequest request, CancellationToken cancellationToken)
     {
-        var deployment = await deploymentService.CreateDeploymentAsync(request, CurrentUserId, cancellationToken);
+        var userId = await currentSessionAccessor.GetDisplayNameAsync(cancellationToken);
+        var deployment = await deploymentService.CreateDeploymentAsync(request, userId, cancellationToken);
         return Ok(DeploymentResponse.FromModel(deployment));
     }
 

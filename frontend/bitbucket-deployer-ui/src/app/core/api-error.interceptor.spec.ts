@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { apiErrorInterceptor } from './api-error.interceptor';
 import { ApiError } from './api-error.model';
@@ -8,13 +9,15 @@ import { ApiError } from './api-error.model';
 describe('apiErrorInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
+  let router: Router;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(withInterceptors([apiErrorInterceptor])), provideHttpClientTesting()]
+      providers: [provideHttpClient(withInterceptors([apiErrorInterceptor])), provideHttpClientTesting(), provideRouter([])]
     });
     http = TestBed.inject(HttpClient);
     httpMock = TestBed.inject(HttpTestingController);
+    router = TestBed.inject(Router);
   });
 
   afterEach(() => httpMock.verify());
@@ -51,5 +54,15 @@ describe('apiErrorInterceptor', () => {
     const err = (await pending) as ApiError;
     expect(err.status).toBe(0);
     expect(err.message).toContain('Could not reach the server');
+  });
+
+  it('redirects to /login on a 401 response', async () => {
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+    const pending = firstValueFrom(http.get('/api/thing')).catch((err: ApiError) => err);
+
+    httpMock.expectOne('/api/thing').flush({ message: 'Please log in with Bitbucket.' }, { status: 401, statusText: 'Unauthorized' });
+
+    await pending;
+    expect(navigateSpy).toHaveBeenCalledWith('/login');
   });
 });

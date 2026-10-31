@@ -6,6 +6,7 @@ import { Repository } from '../models/repository.model';
 import { Branch } from '../models/branch.model';
 import { Pipeline } from '../models/pipeline.model';
 import { PagedResponse } from '../models/paged-response.model';
+import { DeploymentEnvironment } from '../models/deployment-environment.model';
 
 /**
  * All repository/branch/pipeline discovery calls. Deliberately thin — no caching or state here,
@@ -16,6 +17,10 @@ import { PagedResponse } from '../models/paged-response.model';
 export class RepositoryService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/deployments`;
+
+  getEnvironments(): Observable<DeploymentEnvironment[]> {
+    return this.http.get<DeploymentEnvironment[]>(`${this.baseUrl}/environments`);
+  }
 
   getRepositories(search?: string, pageToken?: string): Observable<PagedResponse<Repository>> {
     return this.http.get<PagedResponse<Repository>>(`${this.baseUrl}/repositories`, {

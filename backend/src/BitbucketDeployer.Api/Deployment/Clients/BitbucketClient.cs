@@ -1,9 +1,11 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Web;
-using Microsoft.Extensions.Options;
 using BitbucketDeployer.Api.Deployment.Clients.Wire;
 using BitbucketDeployer.Api.Deployment.Configuration;
+using Microsoft.Extensions.Options;
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Web;
 
 namespace BitbucketDeployer.Api.Deployment.Clients;
 
@@ -96,14 +98,37 @@ public class BitbucketClient(HttpClient httpClient, IOptions<BitbucketOptions> o
     }
 
     public async Task<BitbucketPipelineRun> TriggerPipelineAsync(
-        string repositorySlug, BitbucketTriggerPipelineRequest request, CancellationToken cancellationToken)
+    string repositorySlug,
+    BitbucketTriggerPipelineRequest request,
+    CancellationToken cancellationToken)
     {
         var path = $"repositories/{_options.Workspace}/{repositorySlug}/pipelines/";
-        using var response = await httpClient.PostAsJsonAsync(path, request, cancellationToken);
+
+        var json = JsonSerializer.Serialize(request);
+
+        Console.WriteLine($"Bitbucket pipeline URL: {path}");
+        Console.WriteLine($"Bitbucket pipeline body: {json}");
+
+        using var response = await httpClient.PostAsJsonAsync(
+            path,
+            request,
+            new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            },
+            cancellationToken);
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        Console.WriteLine($"Bitbucket status: {(int)response.StatusCode}");
+        Console.WriteLine($"Bitbucket response: {responseBody}");
+
         await EnsureSuccess(response, cancellationToken);
 
-        return await response.Content.ReadFromJsonAsync<BitbucketPipelineRun>(cancellationToken: cancellationToken)
-               ?? throw new BitbucketApiException(response.StatusCode, "Bitbucket returned an empty trigger response.");
+        return JsonSerializer.Deserialize<BitbucketPipelineRun>(responseBody)
+               ?? throw new BitbucketApiException(
+                   response.StatusCode,
+                   "Bitbucket returned an empty trigger response.");
     }
 
     public Task<BitbucketPipelineRun> GetPipelineRunAsync(string repositorySlug, string pipelineUuid, CancellationToken cancellationToken) =>
@@ -117,6 +142,9 @@ public class BitbucketClient(HttpClient httpClient, IOptions<BitbucketOptions> o
         using var response = await httpClient.PostAsync(path, content: null, cancellationToken);
         await EnsureSuccess(response, cancellationToken);
     }
+
+    public Task<BitbucketUser> GetCurrentUserAsync(CancellationToken cancellationToken) =>
+        GetAsync<BitbucketUser>("user", cancellationToken);
 
     private async Task<T> GetAsync<T>(string pathOrAbsoluteUrl, CancellationToken cancellationToken)
     {
@@ -146,8 +174,7 @@ public class BitbucketClient(HttpClient httpClient, IOptions<BitbucketOptions> o
             // Bitbucket occasionally returns non-JSON error bodies (e.g. plain-text 5xx from its edge).
         }
 
-        logger.LogWarning(
-            "Bitbucket API call failed with {StatusCode}: {Message}. RequestUri={RequestUri} RawBody={RawBody}",
+        logger.LogWarning("Bitbucket API call failed with {StatusCode}: {Message}. RequestUri={RequestUri} RawBody={RawBody}",
             (int)response.StatusCode, bitbucketMessage ?? "(no message)", response.RequestMessage?.RequestUri,
             string.IsNullOrEmpty(rawBody) ? "(empty)" : rawBody);
 

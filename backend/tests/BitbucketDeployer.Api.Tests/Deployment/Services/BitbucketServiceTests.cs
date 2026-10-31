@@ -108,6 +108,39 @@ public class BitbucketServiceTests
     }
 
     [Fact]
+    public async Task GetPipelineDefinitionsAsync_MapsDeclaredVariables()
+    {
+        const string yaml = """
+            pipelines:
+              custom:
+                deploy-with-approval:
+                  - variables:
+                      - name: RELEASE_VERSION
+                      - name: CONFIRM
+                        default: "no"
+                        allowed-values:
+                          - "yes"
+                          - "no"
+                  - step:
+                      script:
+                        - ./deploy.sh
+            """;
+
+        _client.Setup(c => c.GetPipelinesYamlAsync("ss-web", "uat", It.IsAny<CancellationToken>())).ReturnsAsync(yaml);
+        _client.Setup(c => c.GetPipelineRunsAsync("ss-web", null, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BitbucketPagedResponse<BitbucketPipelineRun> { Values = [] });
+
+        var result = await _sut.GetPipelineDefinitionsAsync("ss-web", "uat", CancellationToken.None);
+
+        var pipeline = result.Single(p => p.Pattern == "deploy-with-approval");
+        pipeline.Variables.Should().HaveCount(2);
+        pipeline.Variables.Single(v => v.Name == "RELEASE_VERSION").Default.Should().BeNull();
+        var confirm = pipeline.Variables.Single(v => v.Name == "CONFIRM");
+        confirm.Default.Should().Be("no");
+        confirm.AllowedValues.Should().BeEquivalentTo("yes", "no");
+    }
+
+    [Fact]
     public async Task GetPipelineDefinitionsAsync_RunHistoryLookupFails_StillReturnsDefinitions()
     {
         const string yaml = """
@@ -152,5 +185,28 @@ public class BitbucketServiceTests
         result.PipelineUuid.Should().Be("{new-run}");
         result.BuildNumber.Should().Be(42);
         result.Status.Should().Be(DeploymentStatus.Queued);
+    }
+
+    [Fact]
+    public async Task TriggerPipelineAsync_MarksSensitiveLookingVariableNamesAsSecured()
+    {
+        BitbucketTriggerPipelineRequest? captured = null;
+        _client.Setup(c => c.TriggerPipelineAsync("ss-web", It.IsAny<BitbucketTriggerPipelineRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<string, BitbucketTriggerPipelineRequest, CancellationToken>((_, req, _) => captured = req)
+            .ReturnsAsync(new BitbucketPipelineRun { Uuid = "{run}", State = new BitbucketPipelineState { Name = "PENDING" } });
+
+        var variables = new Dictionary<string, string>
+        {
+            ["RELEASE_VERSION"] = "1.2.3",
+            ["DEPLOY_TOKEN"] = "abc123",
+            ["DB_PASSWORD"] = "hunter2"
+        };
+
+        await _sut.TriggerPipelineAsync("ss-web", "uat", "deploy-uat", variables, CancellationToken.None);
+
+        captured!.Variables.Should().NotBeNull();
+        captured.Variables!.Single(v => v.Key == "RELEASE_VERSION").Secured.Should().BeFalse();
+        captured.Variables!.Single(v => v.Key == "DEPLOY_TOKEN").Secured.Should().BeTrue();
+        captured.Variables!.Single(v => v.Key == "DB_PASSWORD").Secured.Should().BeTrue();
     }
 }

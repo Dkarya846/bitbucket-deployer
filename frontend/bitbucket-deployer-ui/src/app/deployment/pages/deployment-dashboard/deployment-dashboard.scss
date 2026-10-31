@@ -1,10 +1,44 @@
 .dashboard {
-  max-width: 860px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 24px 16px 48px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.panels {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+
+  @media (max-width: 900px) {
+    flex-direction: column;
+  }
+}
+
+.panel {
+  flex: 1;
+  min-width: 0; // let long repo/branch names truncate instead of overflowing the flex item
+}
+
+.rows-scroll {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+
+  h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
 }
 
 h1 {

@@ -1,4 +1,4 @@
-import { Component, forwardRef, inject, input, signal } from '@angular/core';
+import { Component, forwardRef, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ControlValueAccessor, FormControl, NG_VALUE_ACCESSOR, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,6 +25,9 @@ import { Pipeline } from '../../models/pipeline.model';
 export class PipelineSelector implements ControlValueAccessor {
   readonly repository = input<string | null>(null);
   readonly branch = input<string | null>(null);
+
+  /** The full selected Pipeline (so the parent row can read its variable definitions) — null when nothing valid is selected. */
+  readonly pipelineSelected = output<Pipeline | null>();
 
   private readonly repositoryService = inject(RepositoryService);
 
@@ -69,7 +72,10 @@ export class PipelineSelector implements ControlValueAccessor {
         }
       });
 
-    this.control.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => this.onChange(value));
+    this.control.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      this.onChange(value);
+      this.pipelineSelected.emit(this.pipelines().find((p) => p.pattern === value) ?? null);
+    });
   }
 
   protected markTouched(): void {

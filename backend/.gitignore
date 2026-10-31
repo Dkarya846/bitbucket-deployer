@@ -2,3 +2,9 @@ bin/
 obj/
 *.user
 .vs/
+
+# Local SQLite deployment history — not shared/committed (see appsettings ConnectionStrings:Deployments)
+App_Data/
+*.db
+*.db-shm
+*.db-wal

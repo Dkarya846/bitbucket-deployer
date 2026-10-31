@@ -37,7 +37,7 @@ public class BitbucketPipelinesYamlParserTests
     }
 
     [Fact]
-    public void ParseCustomPipelines_DetectsRequiredVariablesDeclaration()
+    public void ParseCustomPipelines_DetectsPipelinesWithAndWithoutVariables()
     {
         const string yaml = """
             pipelines:
@@ -56,8 +56,62 @@ public class BitbucketPipelinesYamlParserTests
 
         var result = BitbucketPipelinesYamlParser.ParseCustomPipelines(yaml);
 
-        result.Single(p => p.Pattern == "deploy-uat").RequiresVariables.Should().BeFalse();
-        result.Single(p => p.Pattern == "deploy-production").RequiresVariables.Should().BeTrue();
+        result.Single(p => p.Pattern == "deploy-uat").Variables.Should().BeEmpty();
+        result.Single(p => p.Pattern == "deploy-production").Variables.Should().ContainSingle(v => v.Name == "CONFIRM");
+    }
+
+    [Fact]
+    public void ParseCustomPipelines_ExtractsDefaultAndAllowedValues()
+    {
+        const string yaml = """
+            pipelines:
+              custom:
+                deploy-with-approval:
+                  - variables:
+                      - name: RELEASE_VERSION
+                      - name: CONFIRM
+                        default: "no"
+                        allowed-values:
+                          - "yes"
+                          - "no"
+                  - step:
+                      script:
+                        - ./deploy.sh
+            """;
+
+        var result = BitbucketPipelinesYamlParser.ParseCustomPipelines(yaml);
+        var variables = result.Single(p => p.Pattern == "deploy-with-approval").Variables;
+
+        variables.Should().HaveCount(2);
+
+        var releaseVersion = variables.Single(v => v.Name == "RELEASE_VERSION");
+        releaseVersion.Default.Should().BeNull();
+        releaseVersion.AllowedValues.Should().BeNull();
+
+        var confirm = variables.Single(v => v.Name == "CONFIRM");
+        confirm.Default.Should().Be("no");
+        confirm.AllowedValues.Should().BeEquivalentTo("yes", "no");
+    }
+
+    [Fact]
+    public void ParseCustomPipelines_VariablesBlockInsideParallelStep_IsNotTreatedAsTopLevel()
+    {
+        // Bitbucket only recognizes `variables:` as a top-level sibling of `step`/`parallel` — a
+        // `variables:` key nested inside a step's own map (unrealistic, but worth guarding) should
+        // not be picked up.
+        const string yaml = """
+            pipelines:
+              custom:
+                deploy:
+                  - parallel:
+                      - step:
+                          variables:
+                            - name: NOT_A_REAL_DECLARATION
+            """;
+
+        var result = BitbucketPipelinesYamlParser.ParseCustomPipelines(yaml);
+
+        result.Single(p => p.Pattern == "deploy").Variables.Should().BeEmpty();
     }
 
     [Fact]

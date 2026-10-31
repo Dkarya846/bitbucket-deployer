@@ -32,4 +32,7 @@ public interface IBitbucketClient
         string repositorySlug, string pipelineUuid, CancellationToken cancellationToken);
 
     Task StopPipelineRunAsync(string repositorySlug, string pipelineUuid, CancellationToken cancellationToken);
+
+    /// <summary>The account the configured API token belongs to — not workspace-scoped.</summary>
+    Task<BitbucketUser> GetCurrentUserAsync(CancellationToken cancellationToken);
 }

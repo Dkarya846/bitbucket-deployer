@@ -70,9 +70,16 @@ public class DeploymentValidationService(
             return Invalid(item, "Pipeline does not exist.");
         }
 
-        if (pipeline.RequiresVariables && (item.Variables is null || item.Variables.Count == 0))
+        // Variables with a default are optional — Bitbucket falls back to it when omitted.
+        var missingVariables = pipeline.Variables
+            .Where(v => v.Default is null)
+            .Where(v => item.Variables is null || !item.Variables.TryGetValue(v.Name, out var value) || string.IsNullOrWhiteSpace(value))
+            .Select(v => v.Name)
+            .ToList();
+
+        if (missingVariables.Count > 0)
         {
-            return Invalid(item, "This pipeline requires variables that were not supplied.");
+            return Invalid(item, $"Missing required variable(s): {string.Join(", ", missingVariables)}.");
         }
 
         return new ValidationItemResult { Repository = item.Repository, Branch = item.Branch, Pipeline = item.Pipeline, IsValid = true };

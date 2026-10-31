@@ -26,7 +26,7 @@ public class DeploymentValidationServiceTests
         _bitbucketService.Setup(s => s.GetBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Branch { Name = "uat" });
         _bitbucketService.Setup(s => s.GetPipelineDefinitionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new Pipeline { Pattern = "deploy-uat", DisplayName = "Deploy Uat", RequiresVariables = false }]);
+            .ReturnsAsync([new Pipeline { Pattern = "deploy-uat", DisplayName = "Deploy Uat" }]);
     }
 
     private static DeploymentItemRequest Item(string repo = "ss-web", string branch = "uat", string pipeline = "deploy-uat", Dictionary<string, string>? variables = null) =>
@@ -82,15 +82,49 @@ public class DeploymentValidationServiceTests
     }
 
     [Fact]
-    public async Task ValidateAsync_PipelineRequiresVariables_NoneSupplied_ItemInvalid()
+    public async Task ValidateAsync_PipelineRequiresVariable_NoneSupplied_ItemInvalid_NamesTheMissingVariable()
     {
         _bitbucketService.Setup(s => s.GetPipelineDefinitionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new Pipeline { Pattern = "deploy-uat", DisplayName = "Deploy Uat", RequiresVariables = true }]);
+            .ReturnsAsync([new Pipeline { Pattern = "deploy-uat", DisplayName = "Deploy Uat", Variables = [new PipelineVariable { Name = "RELEASE_VERSION" }] }]);
 
         var result = await _sut.ValidateAsync("uat", "alice", [Item()], CancellationToken.None);
 
         result.IsValid.Should().BeFalse();
-        result.Items[0].ErrorMessage.Should().Contain("requires variables");
+        result.Items[0].ErrorMessage.Should().Contain("RELEASE_VERSION");
+    }
+
+    [Fact]
+    public async Task ValidateAsync_PipelineRequiresVariable_SuppliedValueBlank_ItemInvalid()
+    {
+        _bitbucketService.Setup(s => s.GetPipelineDefinitionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new Pipeline { Pattern = "deploy-uat", DisplayName = "Deploy Uat", Variables = [new PipelineVariable { Name = "RELEASE_VERSION" }] }]);
+
+        var result = await _sut.ValidateAsync("uat", "alice", [Item(variables: new Dictionary<string, string> { ["RELEASE_VERSION"] = "   " })], CancellationToken.None);
+
+        result.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ValidateAsync_PipelineRequiresVariable_ValueSupplied_ItemValid()
+    {
+        _bitbucketService.Setup(s => s.GetPipelineDefinitionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new Pipeline { Pattern = "deploy-uat", DisplayName = "Deploy Uat", Variables = [new PipelineVariable { Name = "RELEASE_VERSION" }] }]);
+
+        var result = await _sut.ValidateAsync(
+            "uat", "alice", [Item(variables: new Dictionary<string, string> { ["RELEASE_VERSION"] = "1.2.3" })], CancellationToken.None);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateAsync_VariableHasDefault_NotSupplied_StillValid()
+    {
+        _bitbucketService.Setup(s => s.GetPipelineDefinitionsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new Pipeline { Pattern = "deploy-uat", DisplayName = "Deploy Uat", Variables = [new PipelineVariable { Name = "CONFIRM", Default = "no" }] }]);
+
+        var result = await _sut.ValidateAsync("uat", "alice", [Item()], CancellationToken.None);
+
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]

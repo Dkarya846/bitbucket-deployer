@@ -1,0 +1,16 @@
+<div class="login-shell">
+  <mat-card appearance="outlined" class="login-card">
+    <mat-icon class="logo">cloud_sync</mat-icon>
+    <h1>Multi-Repo Deployment</h1>
+    <p>Sign in with your Bitbucket account to view and trigger deployments.</p>
+
+    @if (hasError) {
+      <p class="error">Login failed or was cancelled. Please try again.</p>
+    }
+
+    <button mat-flat-button color="primary" type="button" (click)="login()">
+      <mat-icon>login</mat-icon>
+      Login with Bitbucket
+    </button>
+  </mat-card>
+</div>

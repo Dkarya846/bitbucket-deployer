@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics;
+using BitbucketDeployer.Api.Auth.Services;
 using BitbucketDeployer.Api.Deployment.Clients;
 using BitbucketDeployer.Api.Deployment.DTOs;
 using BitbucketDeployer.Api.Deployment.Services;
@@ -40,6 +41,12 @@ public class BitbucketApiExceptionHandler(ILogger<BitbucketApiExceptionHandler> 
 
     private static (int StatusCode, string Message, string ErrorCode) Map(Exception exception) => exception switch
     {
+        NotAuthenticatedException =>
+            (StatusCodes.Status401Unauthorized, exception.Message, "NOT_AUTHENTICATED"),
+
+        BitbucketOAuthException =>
+            (StatusCodes.Status502BadGateway, "Failed to complete Bitbucket login.", "BITBUCKET_OAUTH_ERROR"),
+
         DeploymentNotFoundException =>
             (StatusCodes.Status404NotFound, exception.Message, "DEPLOYMENT_NOT_FOUND"),
 

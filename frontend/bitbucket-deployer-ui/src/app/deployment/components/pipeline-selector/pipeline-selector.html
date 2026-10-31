@@ -4,7 +4,7 @@
     @for (pipeline of pipelines(); track pipeline.pattern) {
       <mat-option [value]="pipeline.pattern">
         {{ pipeline.displayName }}
-        @if (pipeline.requiresVariables) {
+        @if (pipeline.variables.length > 0) {
           <mat-icon class="variables-hint" [matTooltip]="'Requires variables at trigger time'" inline>tune</mat-icon>
         }
       </mat-option>

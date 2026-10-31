@@ -66,7 +66,9 @@ public class BitbucketService(IBitbucketClient client, ILogger<BitbucketService>
                 {
                     Pattern = d.Pattern,
                     DisplayName = ToDisplayName(d.Pattern),
-                    RequiresVariables = d.RequiresVariables,
+                    Variables = d.Variables
+                        .Select(v => new PipelineVariable { Name = v.Name, Default = v.Default, AllowedValues = v.AllowedValues })
+                        .ToList(),
                     LastRunStatus = lastRun is null ? null : BitbucketStatusMapper.Map(lastRun.State),
                     LastRunAt = lastRun?.CreatedOn
                 };
@@ -91,7 +93,14 @@ public class BitbucketService(IBitbucketClient client, ILogger<BitbucketService>
                 RefName = branchName,
                 Selector = new BitbucketPipelineSelector { Type = "custom", Pattern = pipelinePattern }
             },
-            Variables = variables?.Select(kv => new BitbucketPipelineVariable { Key = kv.Key, Value = kv.Value }).ToList()
+            Variables = variables?.Select(kv => new BitbucketPipelineVariable
+            {
+                Key = kv.Key,
+                Value = kv.Value,
+                // Best-effort: Bitbucket masks "secured" values in its own pipeline logs afterward.
+                // The YAML doesn't mark variables as sensitive, so this is a name-based heuristic.
+                Secured = LooksSensitive(kv.Key)
+            }).ToList()
         };
 
         var run = await client.TriggerPipelineAsync(repositorySlug, request, cancellationToken);
@@ -152,6 +161,11 @@ public class BitbucketService(IBitbucketClient client, ILogger<BitbucketService>
         BuildNumber = run.BuildNumber,
         Status = BitbucketStatusMapper.Map(run.State)
     };
+
+    private static readonly string[] SensitiveVariableNameMarkers = ["PASSWORD", "SECRET", "TOKEN", "KEY", "CREDENTIAL"];
+
+    private static bool LooksSensitive(string variableName) =>
+        SensitiveVariableNameMarkers.Any(marker => variableName.Contains(marker, StringComparison.OrdinalIgnoreCase));
 
     private static string ToDisplayName(string pattern) =>
         string.Join(' ', pattern.Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries)

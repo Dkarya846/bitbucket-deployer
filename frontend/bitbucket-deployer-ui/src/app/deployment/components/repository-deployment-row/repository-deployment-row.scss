@@ -31,3 +31,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+.variables-section {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 4px 8px;
+}
+
+.variable-field {
+  flex: 1 1 200px;
+  min-width: 180px;
+}

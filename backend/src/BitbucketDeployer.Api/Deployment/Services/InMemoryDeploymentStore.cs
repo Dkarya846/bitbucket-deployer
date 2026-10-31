@@ -34,4 +34,8 @@ public class InMemoryDeploymentStore : IDeploymentStore
             return $"DEP-{today}-{_sequence:D3}";
         }
     }
+
+    // No-op: Add/Get hand back the live object stored in _deployments, so in-place mutations are
+    // already "persisted" — there's nothing separate to flush.
+    public Task SaveAsync(Models.Deployment deployment, CancellationToken cancellationToken) => Task.CompletedTask;
 }

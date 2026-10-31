@@ -1,5 +1,5 @@
 import { Component, effect, signal, untracked } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, FormRecord, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,10 +14,11 @@ import { DeploymentConfirmation, DeploymentConfirmationData } from '../../compon
 import { DeploymentSummary, DeploymentSummaryRow } from '../../components/deployment-summary/deployment-summary';
 import { RepositoryDeploymentRow, DeploymentRowFormControls } from '../../components/repository-deployment-row/repository-deployment-row';
 import { RepositorySelector } from '../../components/repository-selector/repository-selector';
-import { DEPLOYMENT_ENVIRONMENTS, DeploymentEnvironment } from '../../models/deployment-environment.model';
+import { DeploymentEnvironment } from '../../models/deployment-environment.model';
 import { CreateDeploymentRequest, ValidationResult } from '../../models/deployment.model';
 import { Repository } from '../../models/repository.model';
 import { DeploymentService } from '../../services/deployment.service';
+import { RepositoryService } from '../../services/repository.service';
 
 interface DeploymentRow {
   slug: string;
@@ -45,14 +46,22 @@ interface DeploymentRow {
 })
 export class DeploymentDashboard {
   private readonly deploymentService = inject(DeploymentService);
+  private readonly repositoryService = inject(RepositoryService);
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
 
-  protected readonly environments = DEPLOYMENT_ENVIRONMENTS;
-  protected readonly selectedEnvironmentId = signal(DEPLOYMENT_ENVIRONMENTS[0].id);
+  protected readonly environments = signal<DeploymentEnvironment[]>([]);
+  protected readonly selectedEnvironmentId = signal<string | null>(null);
+  protected readonly environmentsLoading = signal(true);
+  protected readonly environmentsError = signal<string | null>(null);
 
   protected readonly selectedRepositories = signal<Repository[]>([]);
   protected readonly rows = signal<DeploymentRow[]>([]);
+
+  // Panel visibility only — [hidden], not @if, so collapsing never destroys the repository
+  // selector's loaded list/search state or the row forms.
+  protected readonly repositoriesPanelCollapsed = signal(false);
+  protected readonly configPanelCollapsed = signal(false);
 
   protected readonly validating = signal(false);
   protected readonly validationResult = signal<ValidationResult | null>(null);
@@ -69,15 +78,37 @@ export class DeploymentDashboard {
       const selected = this.selectedRepositories();
       untracked(() => this.reconcileRows(selected));
     });
+
+    this.loadEnvironments();
   }
 
-  protected selectedEnvironment(): DeploymentEnvironment {
-    return this.environments.find((e) => e.id === this.selectedEnvironmentId()) ?? this.environments[0];
+  protected retryLoadEnvironments(): void {
+    this.loadEnvironments();
+  }
+
+  private loadEnvironments(): void {
+    this.environmentsLoading.set(true);
+    this.environmentsError.set(null);
+    this.repositoryService.getEnvironments().subscribe({
+      next: (environments) => {
+        this.environments.set(environments);
+        this.selectedEnvironmentId.set(environments[0]?.id ?? null);
+        this.environmentsLoading.set(false);
+      },
+      error: (error: ApiError) => {
+        this.environmentsError.set(error.message);
+        this.environmentsLoading.set(false);
+      }
+    });
+  }
+
+  protected selectedEnvironment(): DeploymentEnvironment | undefined {
+    return this.environments().find((e) => e.id === this.selectedEnvironmentId());
   }
 
   protected canSubmit(): boolean {
     const rows = this.rows();
-    return rows.length > 0 && rows.every((r) => r.form.valid);
+    return rows.length > 0 && rows.every((r) => r.form.valid) && this.selectedEnvironmentId() !== null;
   }
 
   protected validationSummaryRows(): DeploymentSummaryRow[] {
@@ -122,6 +153,9 @@ export class DeploymentDashboard {
     }
 
     const environment = this.selectedEnvironment();
+    if (!environment) {
+      return;
+    }
     const data: DeploymentConfirmationData = { environment, rows: this.buildSummaryRows() };
 
     this.dialog
@@ -151,14 +185,21 @@ export class DeploymentDashboard {
   }
 
   private buildRequest(): CreateDeploymentRequest {
+    // Only ever called from paths gated by canSubmit(), which requires a non-null environment.
     return {
-      environment: this.selectedEnvironmentId(),
+      environment: this.selectedEnvironmentId()!,
       repositories: this.rows().map((r) => ({
         repository: r.slug,
         branch: r.form.controls.branch.value,
-        pipeline: r.form.controls.pipeline.value
+        pipeline: r.form.controls.pipeline.value,
+        variables: this.extractVariables(r.form.controls.variables)
       }))
     };
+  }
+
+  private extractVariables(variablesGroup: FormRecord<FormControl<string>>): Record<string, string> | undefined {
+    const entries = Object.entries(variablesGroup.controls).map(([name, control]) => [name, control.value] as const);
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
   }
 
   private buildSummaryRows(): DeploymentSummaryRow[] {
@@ -185,7 +226,9 @@ export class DeploymentDashboard {
   private createRowForm(): FormGroup<DeploymentRowFormControls> {
     return new FormGroup<DeploymentRowFormControls>({
       branch: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-      pipeline: new FormControl('', { nonNullable: true, validators: [Validators.required] })
+      pipeline: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+      // Populated dynamically per selected pipeline — see RepositoryDeploymentRow.onPipelineSelected.
+      variables: new FormRecord<FormControl<string>>({})
     });
   }
 }

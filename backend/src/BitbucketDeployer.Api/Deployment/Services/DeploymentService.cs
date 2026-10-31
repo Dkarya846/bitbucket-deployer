@@ -48,6 +48,7 @@ public class DeploymentService(
         await Task.WhenAll(deployment.Items.Select(item => TriggerItemAsync(deployment.Id, item, cancellationToken)));
 
         deployment.Status = DeploymentStatusAggregator.Aggregate(deployment.Items.Select(i => i.Status).ToList());
+        await store.SaveAsync(deployment, cancellationToken);
         logger.LogInformation("DeploymentId={DeploymentId} Status={Status} Deployment completed triggering", deployment.Id, deployment.Status);
 
         return deployment;
@@ -66,6 +67,7 @@ public class DeploymentService(
         {
             await Task.WhenAll(nonTerminalItems.Select(item => RefreshItemStatusAsync(deploymentId, item, cancellationToken)));
             deployment.Status = DeploymentStatusAggregator.Aggregate(deployment.Items.Select(i => i.Status).ToList());
+            await store.SaveAsync(deployment, cancellationToken);
         }
 
         return deployment;
@@ -81,6 +83,7 @@ public class DeploymentService(
         await Task.WhenAll(cancellableItems.Select(item => CancelItemAsync(deploymentId, item, cancellationToken)));
 
         deployment.Status = DeploymentStatusAggregator.Aggregate(deployment.Items.Select(i => i.Status).ToList());
+        await store.SaveAsync(deployment, cancellationToken);
         logger.LogInformation("DeploymentId={DeploymentId} Status={Status} Deployment cancelled by request", deploymentId, deployment.Status);
         return deployment;
     }
@@ -94,6 +97,7 @@ public class DeploymentService(
         {
             await Task.WhenAll(failedItems.Select(item => TriggerItemAsync(deploymentId, item, cancellationToken)));
             deployment.Status = DeploymentStatusAggregator.Aggregate(deployment.Items.Select(i => i.Status).ToList());
+            await store.SaveAsync(deployment, cancellationToken);
             logger.LogInformation(
                 "DeploymentId={DeploymentId} Status={Status} Retry requested for {Count} failed item(s)",
                 deploymentId, deployment.Status, failedItems.Count);

@@ -1,8 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { apiErrorInterceptor } from '../../../core/api-error.interceptor';
 import { DeploymentDashboard } from './deployment-dashboard';
 
 describe('DeploymentDashboard', () => {
@@ -18,16 +19,22 @@ describe('DeploymentDashboard', () => {
   beforeEach(async () => {
     TestBed.configureTestingModule({
       imports: [DeploymentDashboard],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()]
+      providers: [provideHttpClient(withInterceptors([apiErrorInterceptor])), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()]
     });
     fixture = TestBed.createComponent(DeploymentDashboard);
     component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     await fixture.whenStable();
-    // repository-selector fires an initial search on construction — drain it so it doesn't
-    // leak into other tests via httpMock.verify().
-    httpMock.match(() => true).forEach((req) => req.flush({ items: [], nextPageToken: null }));
+    // The dashboard loads environments, and repository-selector fires an initial search, both on
+    // construction — drain both so they don't leak into other tests via httpMock.verify(). Each
+    // has a different response shape (plain array vs. paged), so they're matched separately.
+    httpMock.match((r) => r.url.includes('/environments')).forEach((req) =>
+      req.flush([{ id: 'uat', name: 'UAT', requiresExtraConfirmation: false }])
+    );
+    httpMock.match((r) => r.url.includes('/repositories') && !r.url.includes('/environments')).forEach((req) =>
+      req.flush({ items: [], nextPageToken: null })
+    );
   });
 
   afterEach(() => httpMock.verify());
@@ -91,5 +98,68 @@ describe('DeploymentDashboard', () => {
       environment: 'production',
       repositories: [{ repository: 'ss-web', branch: 'uat', pipeline: 'deploy-uat' }]
     });
+  });
+});
+
+describe('DeploymentDashboard environments loading', () => {
+  // Separate from the outer describe's beforeEach, which auto-flushes /environments with a fixed
+  // response — these tests need to control that response themselves.
+  let fixture: ReturnType<typeof TestBed.createComponent<DeploymentDashboard>>;
+  let component: any;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [DeploymentDashboard],
+      providers: [provideHttpClient(withInterceptors([apiErrorInterceptor])), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()]
+    });
+    fixture = TestBed.createComponent(DeploymentDashboard);
+    component = fixture.componentInstance;
+    httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    httpMock.match(() => true).forEach((req) => req.flush({ items: [], nextPageToken: null }));
+    httpMock.verify();
+  });
+
+  it('defaults selectedEnvironmentId to the first loaded environment', () => {
+    expect(component.environmentsLoading()).toBe(true);
+
+    httpMock
+      .expectOne((r) => r.url.includes('/environments'))
+      .flush([
+        { id: 'uat', name: 'UAT', requiresExtraConfirmation: false },
+        { id: 'production', name: 'Production', requiresExtraConfirmation: true }
+      ]);
+
+    expect(component.environmentsLoading()).toBe(false);
+    expect(component.environments()).toHaveLength(2);
+    expect(component.selectedEnvironmentId()).toBe('uat');
+  });
+
+  it('shows an error and stops loading when the environments request fails', () => {
+    httpMock
+      .expectOne((r) => r.url.includes('/environments'))
+      .flush({ message: 'Server exploded' }, { status: 500, statusText: 'Server Error' });
+
+    expect(component.environmentsLoading()).toBe(false);
+    expect(component.environmentsError()).toBe('Server exploded');
+    expect(component.environments()).toEqual([]);
+  });
+
+  it('retryLoadEnvironments re-fetches and clears the error on success', () => {
+    httpMock
+      .expectOne((r) => r.url.includes('/environments'))
+      .flush({ message: 'Server exploded' }, { status: 500, statusText: 'Server Error' });
+    expect(component.environmentsError()).toBe('Server exploded');
+
+    component.retryLoadEnvironments();
+
+    httpMock.expectOne((r) => r.url.includes('/environments')).flush([{ id: 'uat', name: 'UAT', requiresExtraConfirmation: false }]);
+
+    expect(component.environmentsError()).toBeNull();
+    expect(component.environments()).toHaveLength(1);
   });
 });

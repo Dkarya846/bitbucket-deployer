@@ -1,8 +1,8 @@
 namespace BitbucketDeployer.Api.Deployment.Configuration;
 
 /// <summary>
-/// Bitbucket Cloud connection settings. Populate ApiToken from user-secrets/environment
-/// variables/a secret manager in real environments — never commit it to appsettings.json.
+/// Bitbucket Cloud connection settings. Authentication is per-user via OAuth (see
+/// BitbucketOAuthOptions) — there is no shared app-wide token anymore.
 /// </summary>
 public class BitbucketOptions
 {
@@ -12,9 +12,6 @@ public class BitbucketOptions
 
     /// <summary>Must end with a trailing slash — HttpClient.BaseAddress silently drops the path otherwise.</summary>
     public string BaseUrl { get; set; } = "https://api.bitbucket.org/2.0/";
-
-    /// <summary>Bitbucket Cloud API token (Bearer auth), scoped to repository/pipeline read+write.</summary>
-    public string ApiToken { get; set; } = string.Empty;
 
     public int TimeoutSeconds { get; set; } = 30;
 

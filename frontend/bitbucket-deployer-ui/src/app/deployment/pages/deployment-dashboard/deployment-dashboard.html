@@ -1,31 +1,82 @@
 <div class="dashboard">
   <h1>Multi-Repo Deployment</h1>
 
-  <mat-form-field appearance="outline" class="environment-field">
-    <mat-label>Environment</mat-label>
-    <mat-select [value]="selectedEnvironmentId()" (selectionChange)="selectedEnvironmentId.set($event.value)">
-      @for (env of environments; track env.id) {
-        <mat-option [value]="env.id">{{ env.name }}</mat-option>
+  @if (environmentsError()) {
+    <div class="banner error">
+      Failed to load environments: {{ environmentsError() }}
+      <button mat-button type="button" (click)="retryLoadEnvironments()">Retry</button>
+    </div>
+  } @else {
+    <mat-form-field appearance="outline" class="environment-field">
+      <mat-label>Environment</mat-label>
+      <mat-select
+        [value]="selectedEnvironmentId()"
+        [disabled]="environmentsLoading()"
+        (selectionChange)="selectedEnvironmentId.set($event.value)"
+      >
+        @for (env of environments(); track env.id) {
+          <mat-option [value]="env.id">{{ env.name }}</mat-option>
+        }
+      </mat-select>
+      @if (environmentsLoading()) {
+        <mat-hint>Loading environments…</mat-hint>
       }
-    </mat-select>
-  </mat-form-field>
+    </mat-form-field>
+  }
 
-  <mat-card appearance="outlined" class="section">
-    <app-repository-selector [(selected)]="selectedRepositories" />
-  </mat-card>
-
-  @if (rows().length > 0) {
-    <mat-card appearance="outlined" class="section">
-      @for (row of rows(); track row.slug) {
-        <app-repository-deployment-row
-          [formGroup]="row.form"
-          [repositoryName]="row.name"
-          [repositorySlug]="row.slug"
-          (removeRow)="selectedRepositories.set(selectedRepositories().filter((r) => r.slug !== row.slug))"
-        />
-      }
+  <div class="panels">
+    <mat-card appearance="outlined" class="section panel">
+      <div class="panel-header">
+        <h2>Repositories</h2>
+        <button
+          mat-icon-button
+          type="button"
+          [attr.aria-label]="repositoriesPanelCollapsed() ? 'Expand repositories panel' : 'Collapse repositories panel'"
+          (click)="repositoriesPanelCollapsed.set(!repositoriesPanelCollapsed())"
+        >
+          <mat-icon>{{ repositoriesPanelCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+        </button>
+      </div>
+      <div [hidden]="repositoriesPanelCollapsed()">
+        <app-repository-selector [(selected)]="selectedRepositories" />
+      </div>
     </mat-card>
 
+    <mat-card appearance="outlined" class="section panel">
+      <div class="panel-header">
+        <h2>Configure Deployment</h2>
+        <button
+          mat-icon-button
+          type="button"
+          [attr.aria-label]="configPanelCollapsed() ? 'Expand configuration panel' : 'Collapse configuration panel'"
+          (click)="configPanelCollapsed.set(!configPanelCollapsed())"
+        >
+          <mat-icon>{{ configPanelCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+        </button>
+      </div>
+      <div [hidden]="configPanelCollapsed()">
+        @if (rows().length > 0) {
+          <div class="rows-scroll">
+            @for (row of rows(); track row.slug) {
+              <app-repository-deployment-row
+                [formGroup]="row.form"
+                [repositoryName]="row.name"
+                [repositorySlug]="row.slug"
+                (removeRow)="selectedRepositories.set(selectedRepositories().filter((r) => r.slug !== row.slug))"
+              />
+            }
+          </div>
+        } @else {
+          <div class="empty-state">
+            <mat-icon>inbox</mat-icon>
+            <p>Select one or more repositories to configure a deployment.</p>
+          </div>
+        }
+      </div>
+    </mat-card>
+  </div>
+
+  @if (rows().length > 0) {
     <p class="selected-count">Selected: {{ rows().length }} repositor{{ rows().length === 1 ? 'y' : 'ies' }}</p>
 
     @if (validationError()) {
@@ -53,11 +104,6 @@
       <button mat-flat-button color="primary" type="button" [disabled]="!canSubmit() || validating() || deploying()" (click)="openConfirmation()">
         Deploy {{ rows().length }} Repositor{{ rows().length === 1 ? 'y' : 'ies' }}
       </button>
-    </div>
-  } @else {
-    <div class="empty-state">
-      <mat-icon>inbox</mat-icon>
-      <p>Select one or more repositories above to configure a deployment.</p>
     </div>
   }
 </div>

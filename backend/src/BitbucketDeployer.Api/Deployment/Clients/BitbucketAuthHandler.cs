@@ -1,23 +1,19 @@
 using System.Net.Http.Headers;
-using Microsoft.Extensions.Options;
-using BitbucketDeployer.Api.Deployment.Configuration;
+using BitbucketDeployer.Api.Auth.Services;
 
 namespace BitbucketDeployer.Api.Deployment.Clients;
 
 /// <summary>
-/// Attaches the Bitbucket API token to every outgoing request. Centralized here so the token
-/// never has to be threaded through service code, and can never accidentally end up in a log line.
+/// Attaches the current request's logged-in user's Bitbucket access token to every outgoing
+/// request. Throws NotAuthenticatedException (before sending) if no one is logged in — centralized
+/// here so no service code has to check login state itself.
 /// </summary>
-public class BitbucketAuthHandler(IOptions<BitbucketOptions> options) : DelegatingHandler
+public class BitbucketAuthHandler(ICurrentSessionAccessor currentSessionAccessor) : DelegatingHandler
 {
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var token = options.Value.ApiToken;
-        if (!string.IsNullOrWhiteSpace(token))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        }
-
-        return base.SendAsync(request, cancellationToken);
+        var accessToken = await currentSessionAccessor.GetAccessTokenAsync(cancellationToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        return await base.SendAsync(request, cancellationToken);
     }
 }
